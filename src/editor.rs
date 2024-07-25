@@ -1,42 +1,63 @@
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use crossterm::event::{read, Event::Key, KeyCode::Char};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
+use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
+use crossterm::execute;
+use std::io::stdout;
 
-pub struct Editor {}
+pub struct Editor {
+    should_quit: bool
+}
 
 impl Editor {
     pub fn default() -> Self {
-        Editor{}
-    }
-
-    pub fn run(&self) {
-        if let Err(err) = self.repl() {
-            panic!("{err:#?}");
+        Editor{
+            should_quit: false
         }
     }
 
-    pub fn repl(&self) -> Result<(), std::io::Error> {
-        enable_raw_mode().unwrap();
+    pub fn run(&mut self) {
+        Self::initialize().unwrap();
+        let result = self.repl();
+        Self::terminate().unwrap();
+        result.unwrap();
+    }
+
+    // 初始化
+    fn initialize() -> Result<(), std::io::Error>{
+        enable_raw_mode()?;
+        Self::clean_screen()
+    }
+
+    // 结束
+    fn terminate() -> Result<(), std::io::Error>{
+        disable_raw_mode()
+    }
+
+    // 清屏
+    fn clean_screen() -> Result<(), std::io::Error>{
+        let mut stdout = stdout();
+        execute!(stdout, Clear(ClearType::All))
+    }
+
+    fn repl(&mut self) -> Result<(), std::io::Error> {
         loop {
-            match read() {
-                Ok(Key(event)) => {
-                    println!("{:?}\r",event);
-                    match event.code {
-                        Char(char) => {
-                            if char == 'q'{
-                                break;
-                            }
-                        }
-                        _ => ()
-                    }
-                },
-                Err(err) => {
-                    println!("{} \r", err)
-                }
-                _ => ()
+            let event = read()?;
+            self.evaluate_event(&event);
+            if self.should_quit {
+                break;
             }
         }
-        disable_raw_mode()?;
         Ok(())
     }
 
+    fn evaluate_event(&mut self, event: &Event) {
+        if let Key(
+            KeyEvent{
+                code: Char('q'),
+                modifiers: KeyModifiers::CONTROL,
+                .. // 忽略其他字段
+            }
+        ) = event {
+            self.should_quit = true;
+        }
+    }
 }
