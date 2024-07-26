@@ -1,50 +1,33 @@
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
-use crossterm::event::{read, Event, Event::Key, KeyCode::Char, KeyEvent, KeyModifiers};
-use crossterm::execute;
-use std::io::stdout;
+use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers};
+mod terminals;
+use terminals::Terminal;
 
 pub struct Editor {
     should_quit: bool
 }
 
 impl Editor {
-    pub fn default() -> Self {
+    pub const fn default() -> Self {
         Editor{
             should_quit: false
         }
     }
 
     pub fn run(&mut self) {
-        Self::initialize().unwrap();
+        Terminal::initialize().unwrap();
         let result = self.repl();
-        Self::terminate().unwrap();
+        Terminal::terminate().unwrap();
         result.unwrap();
-    }
-
-    // 初始化
-    fn initialize() -> Result<(), std::io::Error>{
-        enable_raw_mode()?;
-        Self::clean_screen()
-    }
-
-    // 结束
-    fn terminate() -> Result<(), std::io::Error>{
-        disable_raw_mode()
-    }
-
-    // 清屏
-    fn clean_screen() -> Result<(), std::io::Error>{
-        let mut stdout = stdout();
-        execute!(stdout, Clear(ClearType::All))
     }
 
     fn repl(&mut self) -> Result<(), std::io::Error> {
         loop {
-            let event = read()?;
-            self.evaluate_event(&event);
+            self.refresh_screen()?;
             if self.should_quit {
                 break;
             }
+            let event = read()?;
+            self.evaluate_event(&event);
         }
         Ok(())
     }
@@ -60,4 +43,27 @@ impl Editor {
             self.should_quit = true;
         }
     }
+
+    fn refresh_screen(&self) -> Result<(), std::io::Error>{
+        if self.should_quit {
+            print!("Goodbye.\r\n");
+        } else {
+            Self::draw_rows()?;
+            Terminal::move_cursor_to(0, 0)?;
+        }
+        Ok(())
+    }
+
+    fn draw_rows() -> Result<(), std::io::Error> {
+        // 获取终端行数
+        let height = Terminal::size()?.1;
+        for current_row in 0..height {
+            print!("~");
+            if current_row + 1 < height {
+                print!("\r\n");
+            }
+        }
+        Ok(())
+    }
+
 }
