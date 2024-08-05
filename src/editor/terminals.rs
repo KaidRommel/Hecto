@@ -1,7 +1,9 @@
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
-use crossterm::execute;
-use crossterm::cursor::{MoveTo};
-use std::io::stdout;
+use crossterm::{execute, queue};
+use crossterm::cursor::{MoveTo, Hide, Show};
+use crossterm::style::Print;
+use std::io::{stdout, Write};
+use core::fmt::Display;
 
 pub struct Terminal{}
 
@@ -19,17 +21,40 @@ impl Terminal {
 
     // 清屏
     pub fn clean_screen() -> Result<(), std::io::Error>{
-        let mut stdout = stdout();
-        execute!(stdout, Clear(ClearType::All))
-        //execute!(stdout, MoveTo(0,0))
+        queue!(stdout(), Clear(ClearType::All))
     }
 
     pub fn move_cursor_to(x: u16, y: u16) -> Result<(), std::io::Error>{
-        execute!(stdout(), MoveTo(x, y))
+        queue!(stdout(), MoveTo(x, y))
     }
 
+    pub fn show_cursor() -> Result<(), std::io::Error>{
+        queue!(stdout(), Show)
+    }
+
+    pub fn hide_cursor() -> Result<(), std::io::Error>{
+        queue!(stdout(), Hide)
+    }
+
+    pub fn print(message: impl Display) -> Result<(), std::io::Error> {
+        queue!(stdout(), Print(message))
+    }
+    
     // 获取窗口的列数和行数
-    pub fn size() -> Result<(u16, u16), std::io::Error>{
+    pub fn size() -> Result<(u16,u16), std::io::Error>{
         size()
     }
+    
+    // 执行缓冲区的指令
+    pub fn execute() -> Result<(), std::io::Error> {
+        stdout().flush()?;
+        Ok(())
+    }
+
+    // 将指令载入缓冲区
+    // todo
+
+    
+
+    
 }
