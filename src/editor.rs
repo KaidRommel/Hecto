@@ -1,4 +1,5 @@
-use crossterm::event::{read, Event::{self, Key}, KeyCode::Char, KeyEvent, KeyModifiers};
+use crossterm::event::{read, Event::{self, Key}, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use core::cmp::min;
 mod terminals;
 use terminals::Terminal;
 
@@ -11,7 +12,8 @@ struct Location {
 }
 
 pub struct Editor {
-    should_quit: bool
+    should_quit: bool,
+    location: Location,
 }
 
 impl Editor {
@@ -21,6 +23,7 @@ impl Editor {
         }
     }
 
+    // editor 入口
     pub fn run(&mut self) {
         Terminal::initialize().unwrap();
         let result = self.repl();
@@ -40,16 +43,49 @@ impl Editor {
         Ok(())
     }
 
-    fn evaluate_event(&mut self, event: &Event) {
+    fn move_point(&mut self, key_code:KeyCode) -> Result<(), std::io::Error>  {
+        let Location{mut x, mut y} = self.location;
+        let (height, width) = Terminal::size()?;
+        match key_code {
+            KeyCode::Up => {
+                // 饱和减法
+                y = y.saturating_sub(1);
+            }
+            KeyCode::Down => {
+                y = min(height.saturating_sub(1).into(), y.saturating_add(1));
+            }
+            _ => ()
+        }
+        Ok(())
+    }
+
+    fn evaluate_event(&mut self, event: &Event) -> Result<(), std::io::Error> {
         if let Key(
-            KeyEvent{
-                code: Char('q'),
-                modifiers: KeyModifiers::CONTROL,
-                .. // 忽略其他字段
+            KeyEvent{ 
+                code,
+                modifiers,
+                kind: KeyEventKind::Press,
+                ..
             }
         ) = event {
-            self.should_quit = true;
+            match code {
+                KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
+                    self.should_quit = true;
+                }
+                KeyCode::Up
+                | KeyCode::Down
+                | KeyCode::Left
+                | KeyCode::Right
+                | KeyCode::PageDown
+                | KeyCode::PageUp
+                | KeyCode::End
+                | KeyCode::Home => {
+                    self.move_point(*code)?;
+                }
+                _ => ()
+            }
         }
+        Ok(())
     }
 
     fn refresh_screen(&self) -> Result<(), std::io::Error>{
